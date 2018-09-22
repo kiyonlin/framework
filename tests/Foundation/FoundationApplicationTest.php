@@ -113,6 +113,9 @@ class FoundationApplicationTest extends TestCase
         $this->assertEquals(1, ApplicationDeferredServiceProviderCountStub::$count);
     }
 
+    /**
+     * 使用 instance 注册后，服务懒加载不会运行
+     */
     public function testDeferredServiceDontRunWhenInstanceSet()
     {
         $app = new Application;

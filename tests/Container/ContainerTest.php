@@ -8,164 +8,277 @@ use Illuminate\Container\Container;
 
 class ContainerTest extends TestCase
 {
+
+    /**
+     * 容器是一个单例模型
+     */
     public function testContainerSingleton()
     {
+        // 设置新容器
         $container = Container::setInstance(new Container);
 
+        // 获取的新实例与设置的容器是同一个对象
         $this->assertSame($container, Container::getInstance());
 
+        // 置空容器对象
         Container::setInstance(null);
 
+        // 获取新的容器对象
         $container2 = Container::getInstance();
 
+        // 新的容器对象还是一个 Container 类的实例
         $this->assertInstanceOf(Container::class, $container2);
+        // 但新容器和旧容器不是同一个对象
         $this->assertNotSame($container, $container2);
     }
 
+    /**
+     * 闭包解析
+     */
     public function testClosureResolution()
     {
+        // 获取容器
         $container = new Container;
+        // 使用 bind 注册 name 服务为一个闭包，该闭包返回 'Taylor'
         $container->bind('name', function () {
             return 'Taylor';
         });
+        // 使用 make 解析 name 服务的结果与预期一致
         $this->assertEquals('Taylor', $container->make('name'));
     }
 
+    /**
+     * 假如服务已经注册，bindIf 不会再次注册
+     */
     public function testBindIfDoesntRegisterIfServiceAlreadyRegistered()
     {
         $container = new Container;
+        // 使用 bind 注册 name 服务为一个闭包，该闭包返回 'Taylor'
         $container->bind('name', function () {
             return 'Taylor';
         });
+        // 使用 bindIf 注册 name 服务为一个闭包，该闭包返回 'Dayle'
         $container->bindIf('name', function () {
             return 'Dayle';
         });
 
+        // 因为 name 服务已经注册，所以使用 make 解析 name 服务的结果还是 'Taylor'
         $this->assertEquals('Taylor', $container->make('name'));
     }
 
+    /**
+     * 假如服务尚未注册，bindIf 会注册成功
+     */
     public function testBindIfDoesRegisterIfServiceNotRegisteredYet()
     {
         $container = new Container;
+        // 使用 bind 注册 surname 服务为一个闭包，该闭包返回 'Taylor'
         $container->bind('surname', function () {
             return 'Taylor';
         });
+        // 使用 bindIf 注册 name 服务为一个闭包，该闭包返回 'Dayle'
         $container->bindIf('name', function () {
             return 'Dayle';
         });
 
+        // 因为 name 服务从未注册，所以使用 make 解析 name 服务的结果是 'Dayle'
         $this->assertEquals('Dayle', $container->make('name'));
     }
 
+    /**
+     * 共享闭包解析——注册单例服务
+     */
     public function testSharedClosureResolution()
     {
         $container = new Container;
+        // 创建标准类对象
         $class = new stdClass;
+        // 使用 singleton 注册 class 服务为一个闭包，该闭包返回标准类对象 $class
         $container->singleton('class', function () use ($class) {
             return $class;
         });
+        // 使用 make 解析 class 服务的结果和标准类对象是同一个对象
         $this->assertSame($class, $container->make('class'));
     }
 
+    /**
+     * 自动对象解析
+     */
     public function testAutoConcreteResolution()
     {
         $container = new Container;
+        // 使用 make 解析 Illuminate\Tests\Container\ContainerConcreteStub 服务的结果为
+        // 'Illuminate\Tests\Container\ContainerConcreteStub' 类的对象
         $this->assertInstanceOf('Illuminate\Tests\Container\ContainerConcreteStub', $container->make('Illuminate\Tests\Container\ContainerConcreteStub'));
     }
 
+    /**
+     * 共享对象解析——解析出单例对象
+     */
     public function testSharedConcreteResolution()
     {
         $container = new Container;
+        // 使用 singleton 注册 Illuminate\Tests\Container\ContainerConcreteStub 服务为单例对象
         $container->singleton('Illuminate\Tests\Container\ContainerConcreteStub');
 
         $var1 = $container->make('Illuminate\Tests\Container\ContainerConcreteStub');
         $var2 = $container->make('Illuminate\Tests\Container\ContainerConcreteStub');
+        // 使用 make 解析 Illuminate\Tests\Container\ContainerConcreteStub 服务获得的两个结果是同一个对象
         $this->assertSame($var1, $var2);
     }
 
+    /**
+     * 依赖解析
+     */
     public function testAbstractToConcreteResolution()
     {
         $container = new Container;
+        // 使用 bind 注册 Illuminate\Tests\Container\IContainerContractStub 接口服务为
+        // Illuminate\Tests\Container\ContainerImplementationStub 接口实现类
         $container->bind('Illuminate\Tests\Container\IContainerContractStub', 'Illuminate\Tests\Container\ContainerImplementationStub');
+
+        // Illuminate\Tests\Container\ContainerDependentStub 类构造函数依赖
+        // Illuminate\Tests\Container\IContainerContractStub 接口
         $class = $container->make('Illuminate\Tests\Container\ContainerDependentStub');
+        // 使用 make 解析 Illuminate\Tests\Container\ContainerDependentStub 类服务结果为 $class 对象
+        // $class 对象的 impl 属性是 Illuminate\Tests\Container\ContainerImplementationStub 类的实例
         $this->assertInstanceOf('Illuminate\Tests\Container\ContainerImplementationStub', $class->impl);
     }
 
+    /**
+     * 递归依赖解析
+     */
     public function testNestedDependencyResolution()
     {
         $container = new Container;
+        // 使用 bind 注册 Illuminate\Tests\Container\IContainerContractStub 接口服务为
+        // Illuminate\Tests\Container\ContainerImplementationStub 接口实现类
         $container->bind('Illuminate\Tests\Container\IContainerContractStub', 'Illuminate\Tests\Container\ContainerImplementationStub');
+
+        // Illuminate\Tests\Container\ContainerNestedDependentStub 类构造函数依赖
+        // Illuminate\Tests\Container\ContainerDependentStub 类;
+        // Illuminate\Tests\Container\ContainerDependentStub 类构造函数依赖
+        // Illuminate\Tests\Container\IContainerContractStub 接口
         $class = $container->make('Illuminate\Tests\Container\ContainerNestedDependentStub');
+
+        // 使用 make 解析 Illuminate\Tests\Container\ContainerNestedDependentStub 类服务结果为 $class 对象
+        // $class 对象的 inner 属性是 Illuminate\Tests\Container\ContainerDependentStub 类的实例
         $this->assertInstanceOf('Illuminate\Tests\Container\ContainerDependentStub', $class->inner);
+
+        // $class 对象的 inner 属性 的 impl 属性是 Illuminate\Tests\Container\ContainerImplementationStub 类的实例
         $this->assertInstanceOf('Illuminate\Tests\Container\ContainerImplementationStub', $class->inner->impl);
     }
 
+    /**
+     * 容器对象会传给闭包
+     */
     public function testContainerIsPassedToResolvers()
     {
         $container = new Container;
+        // 使用 bind 注册 something 服务为一个闭包，该闭包返回自身的第一个参数 $c
         $container->bind('something', function ($c) {
             return $c;
         });
+        // 使用 make 解析 something 服务的结果为 $c
         $c = $container->make('something');
+        // $c 就是闭包返回的其自身的第一个参数，也就是由容器传递过来的容器对象
         $this->assertSame($c, $container);
     }
 
+    /**
+     * 容器可以使用数组形式访问
+     * 因为容器实现了 php 的 ArrayAccess 接口
+     */
     public function testArrayAccess()
     {
         $container = new Container;
+        // 使用数组方式注册 something 服务为一个闭包
         $container['something'] = function () {
             return 'foo';
         };
+        // something 服务是容器的数组变量
         $this->assertTrue(isset($container['something']));
+        // 使用数组方式 解析 something 服务的结果与预期一致
         $this->assertEquals('foo', $container['something']);
+        // 取消容器的 something 服务变量
         unset($container['something']);
+        // 则无法再访问容器的 something 服务变量
         $this->assertFalse(isset($container['something']));
     }
 
+    /**
+     * 解析（递归）别名服务到正确的结果
+     */
     public function testAliases()
     {
         $container = new Container;
+        // 使用数组方式注册 foo 服务为一个字符串 'bar'
         $container['foo'] = 'bar';
+        // 创建 foo 服务别名为 baz
         $container->alias('foo', 'baz');
+        // 创建 baz 服务别名为 bat
         $container->alias('baz', 'bat');
+        // 使用 make 解析 foo 服务获取的结果为字符串 'bar'
         $this->assertEquals('bar', $container->make('foo'));
+        // 使用 make 解析 baz 服务获取的结果为字符串 'bar'
         $this->assertEquals('bar', $container->make('baz'));
+        // 使用 make 解析 bat 服务获取的结果为字符串 'bar'
         $this->assertEquals('bar', $container->make('bat'));
     }
 
+    /**
+     * 解析带数组参数的别名服务
+     */
     public function testAliasesWithArrayOfParameters()
     {
         $container = new Container;
+        // 使用 bind 注册 foo 服务为闭包，该闭包返回其第二个参数
         $container->bind('foo', function ($app, $config) {
             return $config;
         });
+        // 创建 foo 服务别名为 baz
         $container->alias('foo', 'baz');
+        // 使用 make 解析 baz服务（带数组参数 [1, 2, 3]）的结果与预期一致
         $this->assertEquals([1, 2, 3], $container->make('baz', [1, 2, 3]));
     }
 
+    /**
+     * 绑定可以被覆盖
+     */
     public function testBindingsCanBeOverridden()
     {
         $container = new Container;
+        // 使用数组方式注册 foo 服务为一个字符串 'bar'
         $container['foo'] = 'bar';
+        // 使用数组方式注册 foo 服务为一个字符串 'baz'
         $container['foo'] = 'baz';
+        // 使用数组方式 解析 foo 服务的结果是第二次注册的字符串 'baz' 而不是第一次注册的字符串 'bar'
         $this->assertEquals('baz', $container['foo']);
     }
 
+    /**
+     * 扩展绑定
+     */
     public function testExtendedBindings()
     {
         $container = new Container;
         $container['foo'] = 'foo';
+        // 使用 extend 重新注册 foo 服务到一个闭包，该闭包扩展了 foo 服务的解析结果
         $container->extend('foo', function ($old, $container) {
             return $old.'bar';
         });
-
+        // 使用 make 解析 foo 服务的结果和预期一致
         $this->assertEquals('foobar', $container->make('foo'));
 
         $container = new Container;
 
+        // 单例方式注册也支持扩展绑定功能
+
+        // 使用 singleton 注册 foo 服务到一个闭包，该闭包返回一个对象
         $container->singleton('foo', function () {
             return (object) ['name' => 'taylor'];
         });
+        // 使用 extend 重新注册 foo 服务到一个闭包，该闭包扩展了 foo 服务的解析结果
         $container->extend('foo', function ($old, $container) {
             $old->age = 26;
 
@@ -174,38 +287,54 @@ class ContainerTest extends TestCase
 
         $result = $container->make('foo');
 
+        // 使用 make 解析 foo 服务的结果和预期一致
         $this->assertEquals('taylor', $result->name);
         $this->assertEquals(26, $result->age);
         $this->assertSame($result, $container->make('foo'));
     }
 
+    /**
+     * 多次扩展
+     */
     public function testMultipleExtends()
     {
         $container = new Container;
         $container['foo'] = 'foo';
+        // 使用 extend 重新注册 foo 服务到一个闭包，该闭包扩展了 foo 服务的解析结果
         $container->extend('foo', function ($old, $container) {
             return $old.'bar';
         });
+        // 再次使用 extend 重新注册 foo 服务到一个闭包，该闭包扩展了 foo 服务的解析结果
         $container->extend('foo', function ($old, $container) {
             return $old.'baz';
         });
 
+        // 使用 make 解析 foo 服务的结果和预期一致
         $this->assertEquals('foobarbaz', $container->make('foo'));
     }
 
+    /**
+     * instance 注册服务后，返回注册时的实例
+     */
     public function testBindingAnInstanceReturnsTheInstance()
     {
         $container = new Container;
 
         $bound = new stdClass;
+        // 使用 instance 注册 foo 服务到 $bound 对象
         $resolved = $container->instance('foo', $bound);
 
+        // 解析的结果和绑定的对象是同一个
         $this->assertSame($bound, $resolved);
     }
 
+    /**
+     * 扩展实例绑定会被保存下来
+     */
     public function testExtendInstancesArePreserved()
     {
         $container = new Container;
+        // 使用 bind 注册 foo 服务到闭包
         $container->bind('foo', function () {
             $obj = new stdClass;
             $obj->foo = 'bar';
@@ -214,95 +343,139 @@ class ContainerTest extends TestCase
         });
         $obj = new stdClass;
         $obj->foo = 'foo';
+        // 使用 instance 注册 foo 服务到 $obj 对象
+        // 这样会覆盖之前的 bind 注册
         $container->instance('foo', $obj);
+
+        // 使用 extend 扩展 foo 服务
         $container->extend('foo', function ($obj, $container) {
             $obj->bar = 'baz';
 
             return $obj;
         });
+
+        // 再次使用 extend 扩展 foo 服务
         $container->extend('foo', function ($obj, $container) {
             $obj->baz = 'foo';
 
             return $obj;
         });
 
+        // 通过 instance 注册的服务支持多次扩展，解析后的结果与预期一致
         $this->assertEquals('foo', $container->make('foo')->foo);
         $this->assertEquals('baz', $container->make('foo')->bar);
         $this->assertEquals('foo', $container->make('foo')->baz);
     }
 
+    /**
+     * 扩展是懒加载的
+     */
     public function testExtendIsLazyInitialized()
     {
         ContainerLazyExtendStub::$initialized = false;
 
         $container = new Container;
+        // 使用 bind 注册 Illuminate\Tests\Container\ContainerLazyExtendStub 服务
         $container->bind('Illuminate\Tests\Container\ContainerLazyExtendStub');
+        // 使用 extend 扩展 Illuminate\Tests\Container\ContainerLazyExtendStub 服务，将解析出的对象执行 init() 操作并返回
         $container->extend('Illuminate\Tests\Container\ContainerLazyExtendStub', function ($obj, $container) {
             $obj->init();
 
             return $obj;
         });
+        // 使用 make 解析之前，Illuminate\Tests\Container\ContainerLazyExtendStub 的 静态变量 $initialized 是 false
         $this->assertFalse(ContainerLazyExtendStub::$initialized);
         $container->make('Illuminate\Tests\Container\ContainerLazyExtendStub');
+        // 使用 make 解析之后，Illuminate\Tests\Container\ContainerLazyExtendStub 的 静态变量 $initialized 是 true
         $this->assertTrue(ContainerLazyExtendStub::$initialized);
     }
 
+    /**
+     * 扩展可以在 bind 方法之前调用
+     */
     public function testExtendCanBeCalledBeforeBind()
     {
         $container = new Container;
+        // 使用 extend 扩展 foo 服务
         $container->extend('foo', function ($old, $container) {
             return $old.'bar';
         });
+        // 使用数组方式注册 foo 服务
         $container['foo'] = 'foo';
 
+        // 使用 make 解析 foo 服务的结果是扩展后的字符串
         $this->assertEquals('foobar', $container->make('foo'));
     }
 
+    /**
+     * 扩展实例服务会触发 rebinding 回调
+     */
     public function testExtendInstanceRebindingCallback()
     {
         $_SERVER['_test_rebind'] = false;
 
         $container = new Container;
+        // 使用 rebinding 注册 foo 服务的重新绑定回调，将 $_SERVER['_test_rebind'] 置为 true
         $container->rebinding('foo', function () {
             $_SERVER['_test_rebind'] = true;
         });
 
         $obj = new stdClass;
+        // 使用 instance 注册 foo 服务
         $container->instance('foo', $obj);
 
+        // 添加 extend 之前判断，这时候 $_SERVER['_test_rebind'] 未变化
+        $this->assertFalse($_SERVER['_test_rebind']);
+
+        // 使用 extend 扩展 foo 服务，会触发重新绑定操作
         $container->extend('foo', function ($obj, $container) {
             return $obj;
         });
 
+        // $_SERVER['_test_rebind'] 发生改变
         $this->assertTrue($_SERVER['_test_rebind']);
     }
 
+    /**
+     * 扩展绑定服务会触发 rebinding 回调
+     */
     public function testExtendBindRebindingCallback()
     {
         $_SERVER['_test_rebind'] = false;
 
         $container = new Container;
+        // 使用 rebinding 注册 foo 服务的重新绑定回调，将 $_SERVER['_test_rebind'] 置为 true
         $container->rebinding('foo', function () {
             $_SERVER['_test_rebind'] = true;
         });
+
+        // 使用 bind 注册 foo 服务
         $container->bind('foo', function () {
             return new stdClass;
         });
 
+        // 这时候 $_SERVER['_test_rebind'] 未变化
         $this->assertFalse($_SERVER['_test_rebind']);
 
+        // 使用 make 解析 foo 服务
         $container->make('foo');
 
+        // 使用 extend 扩展 foo 服务，会触发重新绑定操作
         $container->extend('foo', function ($obj, $container) {
             return $obj;
         });
 
+        // $_SERVER['_test_rebind'] 发生改变
         $this->assertTrue($_SERVER['_test_rebind']);
     }
 
+    /**
+     * 取消扩展
+     */
     public function testUnsetExtend()
     {
         $container = new Container;
+        // 使用 bind 注册 foo 服务到闭包，闭包返回标准类对象，包含 foo 属性
         $container->bind('foo', function () {
             $obj = new stdClass;
             $obj->foo = 'bar';
@@ -310,27 +483,39 @@ class ContainerTest extends TestCase
             return $obj;
         });
 
+        // 使用 extend 扩展 foo 服务，给对象添加 bar 属性
         $container->extend('foo', function ($obj, $container) {
             $obj->bar = 'baz';
 
             return $obj;
         });
 
-        unset($container['foo']);
+        // 使用 make 解析 foo 服务的结果包含了 foo 属性和 bar 属性，且值也与预期一致
+        $class = $container->make('foo');
+        $this->assertEquals('bar', $class->foo);
+        $this->assertEquals('baz', $class->bar);
+
+        // 取消 foo 服务的扩展
         $container->forgetExtenders('foo');
 
-        $container->bind('foo', function () {
-            return 'foo';
-        });
-
-        $this->assertEquals('foo', $container->make('foo'));
+        // 重新使用 make 解析 foo 服务的结果只包含 foo 属性，且值也与预期一致
+        // 不包含 bar 属性
+        $class = $container->make('foo');
+        $this->assertEquals('bar', $class->foo);
+        $this->assertObjectNotHasAttribute('bar', $class);
     }
 
+    /**
+     * 默认参数解析
+     */
     public function testResolutionOfDefaultParameters()
     {
         $container = new Container;
+        // 使用 make 解析 Illuminate\Tests\Container\ContainerDefaultValueStub 服务，结果为 $instance
         $instance = $container->make('Illuminate\Tests\Container\ContainerDefaultValueStub');
+        // $instance->stub 对象是 Illuminate\Tests\Container\ContainerConcreteStub 类的实例
         $this->assertInstanceOf('Illuminate\Tests\Container\ContainerConcreteStub', $instance->stub);
+        // $instance->default 值是构造函数中的默认值
         $this->assertEquals('taylor', $instance->default);
     }
 
