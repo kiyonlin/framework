@@ -168,6 +168,9 @@ class EventsDispatcherTest extends TestCase
         $this->assertTrue($d->hasListeners('foo.*'));
     }
 
+    /**
+     * 通配符事件接收的第一个参数是事件名称
+     */
     public function testEventPassedFirstToWildcards()
     {
         $d = new Dispatcher;
@@ -192,6 +195,7 @@ class EventsDispatcherTest extends TestCase
 
         $queue->shouldReceive('connection')->once()->with(null)->andReturnSelf();
 
+        // m::type 构造参数类型
         $queue->shouldReceive('pushOn')->once()->with(null, m::type('Illuminate\Events\CallQueuedListener'));
 
         $d->setQueueResolver(function () use ($queue) {
@@ -246,6 +250,7 @@ class EventsDispatcherTest extends TestCase
     {
         $d = m::mock(Dispatcher::class);
 
+        // 允许调用 protected 方法
         $d->makePartial()->shouldAllowMockingProtectedMethods();
 
         $event = new BroadcastEvent;
