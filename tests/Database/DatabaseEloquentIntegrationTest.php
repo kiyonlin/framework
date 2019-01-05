@@ -901,6 +901,7 @@ class DatabaseEloquentIntegrationTest extends TestCase
         $model->fillable(['json->y', 'json->a->b']);
 
         $model->update(['json->y' => '1']);
+        dd($model->toArray());
         $this->assertArrayNotHasKey('json->y', $model->toArray());
         $this->assertEquals(['x' => 0, 'y' => 1], $model->json);
 

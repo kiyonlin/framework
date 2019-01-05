@@ -264,6 +264,7 @@ class AuthAccessGateTest extends TestCase
         });
 
         $gate->after(function ($user, $ability, $result) {
+            // dd($user, $ability, $result);
             return ! $result;
         });
 
@@ -280,6 +281,7 @@ class AuthAccessGateTest extends TestCase
         });
 
         $gate->after(function ($user, $ability, $result) {
+            // dd($user, $ability, $result);
             return ! $result;
         });
 

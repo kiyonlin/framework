@@ -492,9 +492,9 @@ class RouteRegistrarTest extends TestCase
 
     public function testCanSetRouteNameUsingNameAlias()
     {
-        $this->router->name('users.index')->get('users', function () {
+        $this->router->get('users', function () {
             return 'all-users';
-        });
+        })->name('users.index');
 
         $this->seeResponse('all-users', Request::create('users', 'GET'));
         $this->assertEquals('users.index', $this->getRoute()->getName());
